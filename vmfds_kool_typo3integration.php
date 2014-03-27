@@ -130,7 +130,7 @@ function vmfds_kool_typo3integration_fix_typo3_user_groups($id) {
 		// get corresponding typo3 user
 		$t3User = vmfds_kool_typo3integration_get_typo3_user($person['typo3_feuser']);
 		$t3Groups = explode(',',$t3User['usergroup']);
-	
+		
 		// get all typo3 usergroups
 		ko_get_groups($all_groups, 'AND (vmfds_kool_typo3integration_usergroup>0)');
 		foreach ($all_groups as $g) {
