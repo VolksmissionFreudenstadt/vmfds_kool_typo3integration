@@ -66,3 +66,73 @@ function my_action_handler_add_vmfds_kool_typo3integration_submit_edit_group() {
 				   		'vmfds_kool_typo3integration_usergroup' => $typo3,
 				   ));
 }
+
+
+//////////////////////////////////////////////////////////////////////////////////////////////////
+
+// HOOK: save edited person
+
+function my_action_handler_add_vmfds_kool_typo3integration_submit_edit_person() {
+	$id = format_userinput($_POST["leute_id"], "uint");
+	vmfds_kool_typo3integration_fix_typo3_user_groups($id);
+}
+
+
+// HOOK: save new person
+
+function my_action_handler_add_vmfds_kool_typo3integration_submit_neue_person() {
+	$id = $GLOBALS["leute_id"];
+	vmfds_kool_typo3integration_fix_typo3_user_groups($id);
+}
+
+function my_action_handler_add_vmfds_kool_typo3integration_submit_als_neue_person() {
+	$id = $GLOBALS["leute_id"];
+	vmfds_kool_typo3integration_fix_typo3_user_groups($id);
+}
+
+
+
+function vmfds_kool_typo3integration_get_typo3_user($userName) {
+	return db_select_data('usrdb_vmfredbb_t6.fe_users', 'WHERE (username=\''.$userName.'\')', '*','','',TRUE,TRUE);
+}
+
+function vmfds_kool_typo3integration_fix_typo3_user_groups($id) {
+	ko_get_person_by_id($id, $person);
+	
+	if ($person['typo3_feuser']) {
+		// get corresponding typo3 user
+		$t3User = vmfds_kool_typo3integration_get_typo3_user($person['typo3_feuser']);
+		$t3Groups = explode(',',$t3User['usergroup']);
+	
+		// get all typo3 usergroups
+		ko_get_groups($all_groups, 'AND (vmfds_kool_typo3integration_usergroup>0)');
+		foreach ($all_groups as $g) {
+			$all[] = $g['vmfds_kool_typo3integration_usergroup'];
+		}
+		
+		// get all allowed typo3 usergroups
+		$gids = explode(',', $person['groups']);
+		foreach ($gids as $gid) {
+			$group = ko_groups_decode($gid, 'group');
+			if ($group['vmfds_kool_typo3integration_usergroup']) $groups[] = $group['vmfds_kool_typo3integration_usergroup'];
+		}		
+		
+		// first remove all defined typo3 usergroups from the t3User
+		foreach ($all as $g) {
+			if ($key = array_search($g, $t3Groups)) {
+				unset($t3Groups[$key]);
+			}
+		}
+		
+		// then add back those that are allowed
+		foreach ($groups as $g) {
+			$t3Groups[] = $g;
+		}
+
+		// write the user back to the typo3 database (only if changed)		
+		$t3Groups = join(',', $t3Groups);
+		if ($t3Groups != $t3User['usergroup'])
+			db_update_data('usrdb_vmfredbb_t6.fe_users', 'WHERE (username=\''.$person['typo3_feuser'].'\')', array('usergroup' => $t3Groups));
+	}
+	
+}
