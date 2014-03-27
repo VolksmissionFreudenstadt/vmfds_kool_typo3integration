@@ -57,14 +57,41 @@ function my_action_handler_add_vmfds_kool_typo3integration_submit_new_group() {
 // HOOK: save edited group
 
 function my_action_handler_add_vmfds_kool_typo3integration_submit_edit_group() {
+	$id = format_userinput($_POST['id'], 'uint');
+		
+	// check: was this group assigned to a typo3 group before?
+	$group = db_select_data('ko_groups', 'WHERE id='.sprintf('%06d', $id), 'vmfds_kool_typo3integration_usergroup', '', '', TRUE);
+	$oldTypo3Group = $group['vmfds_kool_typo3integration_usergroup'];
+	if ($oldTypo3Group=='_') $oldTypo3Group=''; 
+	
+	// set new group
 	$typo3 = format_userinput($_POST['sel_typo3_usergroup'], 'intlist');
 	if ($typo3=='_') $typo3=''; 
-	$id = format_userinput($_POST['id'], 'uint');
 	db_update_data('ko_groups',
 				   'WHERE id='.sprintf('%06d',$id), 
 				   array(
 				   		'vmfds_kool_typo3integration_usergroup' => $typo3,
 				   ));
+				   
+	// remove the old group from all users
+	if ($oldTypo3Group) {
+		$users = db_select_data('usrdb_vmfredbb_t6.fe_users', 'WHERE FIND_IN_SET('.$oldTypo3Group.', usergroup)', 'uid,usergroup', '', '', FALSE, TRUE);
+		foreach ($users as $user) {
+			$ugs = explode(',', $user['usergroup']);
+			$key = array_search($oldTypo3Group, $ugs);
+			unset($ugs[$key]);
+			db_update_data('usrdb_vmfredbb_t6.fe_users', 'WHERE uid='.$user['uid'], array('usergroup' => join(',', $ugs)));			
+		}	
+	}
+
+	// add the new usergroup to all users in this group
+	$thisGid = sprintf('%06d', $id);
+	ko_get_leute($people, 'AND (groups REGEXP \'g'.$thisGid.'\') AND NOT (groups REGEXP \'g'.$thisGid.':g\')');
+	foreach ($people as $person) {
+		if ($person['typo3_feuser']) {
+			vmfds_kool_typo3integration_fix_typo3_user_groups($person['id']);
+		}
+	} 	
 }
 
 
